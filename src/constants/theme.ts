@@ -49,6 +49,21 @@ export const CustomDarkTheme = {
   },
 };
 
+// React Navigation's Theme type wants `fonts` shaped as { regular, medium,
+// bold, heavy }, which is a different shape than Paper's MD3 typescale —
+// CustomLightTheme/CustomDarkTheme above use the MD3 shape for PaperProvider.
+// These two keep NavLight/NavDark's own `fonts` so NavigationContainer gets
+// the shape it expects, while still sharing the same custom color palette.
+export const AppNavigationLightTheme = {
+  ...NavLight,
+  colors: { ...NavLight.colors, ...CustomLightTheme.colors },
+};
+
+export const AppNavigationDarkTheme = {
+  ...NavDark,
+  colors: { ...NavDark.colors, ...CustomDarkTheme.colors },
+};
+
 export const CAMPUS_MAPS_URL =
   'https://maps.google.com/?q=Universitas+Islam+Riau,+Pekanbaru';
 export const CAMPUS_PHONE = 'tel:+6276178870';
@@ -66,4 +81,9 @@ export const DEFAULT_STUDENT = {
 export const DEFAULT_SETTINGS = {
   darkMode: false,
   notifikasi: true,
+  backgroundSync: true,
 };
+
+// Total SKS above this is treated as "over the registration limit" for the
+// background-sync deadline-warning notification.
+export const MAX_SKS_THRESHOLD = 24;

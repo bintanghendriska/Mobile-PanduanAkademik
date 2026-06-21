@@ -10,7 +10,7 @@ export type BottomTabParamList = {
 
 export type RootStackParamList = {
   Splash: undefined;
-  Main: NavigatorScreenParams<BottomTabParamList>;
+  Main: NavigatorScreenParams<BottomTabParamList> | undefined;
   CourseDetail: { course: Course };
   EditCourse: { course: Course };
   InformasiKampus: undefined;

@@ -15,6 +15,7 @@ interface SettingsContextType {
   settings: AppSettings;
   toggleDarkMode: () => void;
   toggleNotifikasi: () => void;
+  toggleBackgroundSync: () => void;
   loading: boolean;
 }
 
@@ -30,15 +31,18 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         // Try MMKV cache first (sync, fast)
         const cached = mmkvStorage.get<AppSettings>(MMKV_KEYS.SETTINGS_CACHE);
         if (cached) {
-          setSettings(cached);
+          // Merge with defaults so settings saved before a new toggle was
+          // added (e.g. backgroundSync) don't end up `undefined`.
+          setSettings({ ...DEFAULT_SETTINGS, ...cached });
           setLoading(false);
           return;
         }
         // Fallback to AsyncStorage
         const stored = await asyncStorageService.get<AppSettings>(STORAGE_KEYS.SETTINGS);
         if (stored) {
-          setSettings(stored);
-          mmkvStorage.set(MMKV_KEYS.SETTINGS_CACHE, stored);
+          const merged = { ...DEFAULT_SETTINGS, ...stored };
+          setSettings(merged);
+          mmkvStorage.set(MMKV_KEYS.SETTINGS_CACHE, merged);
         }
       } catch (error) {
         console.error('[SettingsContext] load failed:', error);
@@ -63,8 +67,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     persist({ ...settings, notifikasi: !settings.notifikasi });
   }, [settings, persist]);
 
+  const toggleBackgroundSync = useCallback(() => {
+    persist({ ...settings, backgroundSync: !settings.backgroundSync });
+  }, [settings, persist]);
+
   return (
-    <SettingsContext.Provider value={{ settings, toggleDarkMode, toggleNotifikasi, loading }}>
+    <SettingsContext.Provider
+      value={{ settings, toggleDarkMode, toggleNotifikasi, toggleBackgroundSync, loading }}
+    >
       {children}
     </SettingsContext.Provider>
   );

@@ -9,6 +9,9 @@ export interface Course {
   ruangan: string;
   catatan: string;
   createdAt: string;
+  // Sync metadata — undefined for courses created purely offline/local
+  serverId?: number;
+  syncedAt?: string;
 }
 
 export type GradeValue = 'A' | 'A-' | 'B+' | 'B' | 'B-' | 'C+' | 'C' | 'C-' | 'D' | 'E' | 'F';
@@ -57,6 +60,7 @@ export interface Student {
 export interface AppSettings {
   darkMode: boolean;
   notifikasi: boolean;
+  backgroundSync: boolean;
 }
 
 export interface CourseFormData {

@@ -21,7 +21,7 @@ import { notificationService } from '../services/notificationService';
 export default function SettingsScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { settings, toggleDarkMode, toggleNotifikasi } = useSettings();
+  const { settings, toggleDarkMode, toggleNotifikasi, toggleBackgroundSync } = useSettings();
 
   const handleNotifikasi = async () => {
     const willEnable = !settings.notifikasi;
@@ -69,6 +69,13 @@ export default function SettingsScreen() {
       icon: 'bell-outline' as const,
       value: settings.notifikasi,
       onToggle: handleNotifikasi,
+    },
+    {
+      title: 'Sinkronisasi Latar Belakang',
+      description: 'Cek mata kuliah baru dari server setiap ±30 menit',
+      icon: 'cloud-sync-outline' as const,
+      value: settings.backgroundSync,
+      onToggle: toggleBackgroundSync,
     },
   ];
 

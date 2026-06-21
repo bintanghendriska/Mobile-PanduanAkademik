@@ -117,7 +117,7 @@ export default function SplashScreen({ navigation }: Props) {
     Animated.parallel([ringAnim, logoAnim, titleAnim, subtitleAnim, footerAnim]).start();
     glowAnim.start();
 
-    const timer = setTimeout(() => navigation.replace('Main', {}), 3000);
+    const timer = setTimeout(() => navigation.replace('Main'), 3000);
     return () => {
       clearTimeout(timer);
       glowAnim.stop();

@@ -5,6 +5,7 @@ import {
   FlatList,
   RefreshControl,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import {
   Text,
@@ -15,6 +16,7 @@ import {
   Button,
   Menu,
   Divider,
+  ActivityIndicator,
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,10 +26,12 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useCourses, useFilteredAndSortedCourses } from '../hooks/useCourses';
 import { useGrades } from '../hooks/useGrades';
+import { useNetwork } from '../hooks/useNetwork';
 import CourseCard from '../components/CourseCard';
 import AddCourseModal from '../components/AddCourseModal';
 import EmptyState from '../components/EmptyState';
 import LoadingIndicator from '../components/LoadingIndicator';
+import OfflineBanner from '../components/OfflineBanner';
 import { BottomTabParamList, RootStackParamList } from '../navigation/types';
 import { CourseFormData, SortOption } from '../types';
 
@@ -50,8 +54,18 @@ const SORT_LABELS: Record<SortOption, string> = {
 export default function CoursesScreen({ navigation }: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { loading, addCourse, deleteCourse, refreshCourses, error } = useCourses();
+  const {
+    loading,
+    addCourse,
+    deleteCourse,
+    refreshCourses,
+    error,
+    syncing,
+    syncFromServer,
+    postCourseToServer,
+  } = useCourses();
   const { getGrade } = useGrades();
+  const { isOnline } = useNetwork();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sksFilter, setSksFilter] = useState<number | null>(null);
@@ -62,14 +76,39 @@ export default function CoursesScreen({ navigation }: Props) {
 
   const filtered = useFilteredAndSortedCourses(searchQuery, sksFilter, sortOption);
 
+  // Pull-to-refresh re-reads local storage AND merges in anything new from
+  // the server, so a single gesture covers both refresh paths.
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await refreshCourses();
+    try {
+      await syncFromServer();
+    } catch {
+      // syncError is already surfaced via context state; refresh shouldn't crash on it
+    }
     setRefreshing(false);
-  }, [refreshCourses]);
+  }, [refreshCourses, syncFromServer]);
+
+  const handleSyncPress = async () => {
+    if (!isOnline) {
+      Alert.alert('Tidak Ada Koneksi', 'Sambungkan ke internet untuk sinkronisasi dengan server.');
+      return;
+    }
+    try {
+      const { addedCount } = await syncFromServer();
+      Alert.alert(
+        'Sinkronisasi Selesai',
+        addedCount > 0
+          ? `${addedCount} mata kuliah baru ditemukan dari server.`
+          : 'Tidak ada data baru. Data lokal sudah terbaru.',
+      );
+    } catch {
+      Alert.alert('Sinkronisasi Gagal', 'Tidak dapat terhubung ke server. Coba lagi nanti.');
+    }
+  };
 
   const handleAddCourse = async (formData: CourseFormData) => {
-    await addCourse({
+    const payload = {
       nama: formData.nama.trim(),
       kode: formData.kode.trim().toUpperCase(),
       sks: Number(formData.sks),
@@ -78,8 +117,22 @@ export default function CoursesScreen({ navigation }: Props) {
       jam: formData.jam.trim(),
       ruangan: formData.ruangan.trim(),
       catatan: formData.catatan.trim(),
-    });
+    };
+    await addCourse(payload);
     setShowModal(false);
+
+    // Simulate submitting the new course to the server; purely informational —
+    // local save above already succeeded regardless of this outcome.
+    if (!isOnline) {
+      Alert.alert('Tersimpan Secara Lokal', 'Anda sedang offline — akan dikirim ke server saat sinkronisasi berikutnya.');
+      return;
+    }
+    try {
+      const { serverId } = await postCourseToServer(payload);
+      Alert.alert('Tersimpan ke Server (Simulasi)', `Server memberikan ID #${serverId} untuk "${payload.nama}".`);
+    } catch {
+      Alert.alert('Info', 'Mata kuliah tersimpan lokal, namun gagal dikirim ke server.');
+    }
   };
 
   if (loading && !refreshing) return <LoadingIndicator />;
@@ -91,25 +144,41 @@ export default function CoursesScreen({ navigation }: Props) {
         <Text variant="headlineSmall" style={[styles.pageTitle, { color: theme.colors.onBackground }]}>
           Mata Kuliah
         </Text>
-        <Menu
-          visible={sortMenuVisible}
-          onDismiss={() => setSortMenuVisible(false)}
-          anchor={
-            <TouchableOpacity
-              style={[styles.sortBtn, { backgroundColor: theme.colors.primaryContainer }]}
-              onPress={() => setSortMenuVisible(true)}
-            >
+        <View style={styles.topBarActions}>
+          <TouchableOpacity
+            style={[styles.syncBtn, { backgroundColor: theme.colors.secondaryContainer }]}
+            onPress={handleSyncPress}
+            disabled={syncing}
+          >
+            {syncing ? (
+              <ActivityIndicator size={14} color={theme.colors.secondary} />
+            ) : (
               <MaterialCommunityIcons
-                name="sort-variant"
+                name={isOnline ? 'cloud-sync-outline' : 'cloud-off-outline'}
                 size={18}
-                color={theme.colors.primary}
+                color={isOnline ? theme.colors.secondary : theme.colors.outline}
               />
-              <Text variant="labelSmall" style={{ color: theme.colors.primary, marginLeft: 4 }}>
-                {SORT_LABELS[sortOption]}
-              </Text>
-            </TouchableOpacity>
-          }
-        >
+            )}
+          </TouchableOpacity>
+          <Menu
+            visible={sortMenuVisible}
+            onDismiss={() => setSortMenuVisible(false)}
+            anchor={
+              <TouchableOpacity
+                style={[styles.sortBtn, { backgroundColor: theme.colors.primaryContainer }]}
+                onPress={() => setSortMenuVisible(true)}
+              >
+                <MaterialCommunityIcons
+                  name="sort-variant"
+                  size={18}
+                  color={theme.colors.primary}
+                />
+                <Text variant="labelSmall" style={{ color: theme.colors.primary, marginLeft: 4 }}>
+                  {SORT_LABELS[sortOption]}
+                </Text>
+              </TouchableOpacity>
+            }
+          >
           <Text variant="labelMedium" style={styles.menuHeader}>Urutkan</Text>
           <Divider />
           {(Object.keys(SORT_LABELS) as SortOption[]).map((key) => (
@@ -123,8 +192,11 @@ export default function CoursesScreen({ navigation }: Props) {
               leadingIcon={sortOption === key ? 'check' : undefined}
             />
           ))}
-        </Menu>
+          </Menu>
+        </View>
       </View>
+
+      <OfflineBanner />
 
       {/* Error */}
       {!!error && (
@@ -240,6 +312,14 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   pageTitle: { fontWeight: 'bold' },
+  topBarActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  syncBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   sortBtn: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -66,4 +66,43 @@ export const notificationService = {
       console.error('[Notifications] cancelAll failed:', error);
     }
   },
+
+  // Fires immediately (trigger: null) — used right after a sync detects
+  // courses that weren't present locally before.
+  async notifyNewCourses(count: number): Promise<void> {
+    if (!Notifications || count <= 0) return;
+    try {
+      const granted = await this.requestPermissions();
+      if (!granted) return;
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '🆕 Mata Kuliah Baru',
+          body: `${count} mata kuliah baru ditemukan dari server.`,
+          sound: false,
+        },
+        trigger: null,
+      });
+    } catch (error) {
+      console.error('[Notifications] notifyNewCourses failed:', error);
+    }
+  },
+
+  // Fires immediately when total SKS exceeds the registration threshold.
+  async notifySksDeadline(totalSks: number, threshold: number): Promise<void> {
+    if (!Notifications || totalSks <= threshold) return;
+    try {
+      const granted = await this.requestPermissions();
+      if (!granted) return;
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '⚠️ Batas SKS Terlampaui',
+          body: `Total ${totalSks} SKS melebihi batas ${threshold} SKS. Periksa KRS Anda.`,
+          sound: false,
+        },
+        trigger: null,
+      });
+    } catch (error) {
+      console.error('[Notifications] notifySksDeadline failed:', error);
+    }
+  },
 };

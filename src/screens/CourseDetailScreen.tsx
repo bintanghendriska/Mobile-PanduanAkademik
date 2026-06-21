@@ -244,7 +244,7 @@ export default function CourseDetailScreen({ route, navigation }: Props) {
                 </Text>
               </View>
               <Button
-                mode={currentGrade ? 'tonal' : 'contained'}
+                mode={currentGrade ? 'contained-tonal' : 'contained'}
                 onPress={() => setGradePickerVisible(true)}
                 style={styles.setNilaiBtn}
                 compact
